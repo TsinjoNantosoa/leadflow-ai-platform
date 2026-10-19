@@ -1,0 +1,40 @@
+# Environnement de développement LOCAL uniquement.
+#   docker compose up -d db            -> PostgreSQL de dev (port hôte 5433) + base de test
+#   docker compose --profile n8n up -d -> instance n8n JETABLE pour tester les exports (jamais l'instance OVH)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: leadflow
+      POSTGRES_PASSWORD: leadflow_local
+      POSTGRES_DB: leadflow
+    ports:
+      - "5433:5432"
+    volumes:
+      - leadflow_pg:/var/lib/postgresql/data
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/10-init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leadflow -d leadflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Instance n8n locale de TEST (profil optionnel). Port 5679 pour ne pas entrer en conflit.
+  n8n:
+    profiles: ["n8n"]
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:-2.43.8}
+    ports:
+      - "5679:5678"
+    environment:
+      N8N_ENCRYPTION_KEY: local-test-only-not-a-secret
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      GENERIC_TIMEZONE: Europe/Paris
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - leadflow_n8n:/home/node/.n8n
+
+volumes:
+  leadflow_pg:
+  leadflow_n8n:

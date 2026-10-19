@@ -1,0 +1,1484 @@
+{
+  "name": "LF-WF-01 Lead Qualification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lf-wf-01-lead-qualification",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "565f351e-4cf9-58bf-b176-07a72316d8cb",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_N8N_WEBHOOK_SECRET",
+          "name": "LF - n8n Webhook Secret"
+        }
+      },
+      "webhookId": "51845abc-c427-5074-9376-270952788458",
+      "notes": "Appelé UNIQUEMENT par LF-WF-04 (secret d'en-tête). Corps = événement réservé par le backend.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ accepted: true, event_id: $json.body.event_id }) }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "47dcb062-e9d3-5b52-a6ad-19e79c103c54",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Accusé de réception seulement : HTTP 202 ne signifie PAS que le traitement métier est terminé.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e31c3009-0f1f-5280-98d3-bff1a23585ae",
+              "name": "api_base_url",
+              "value": "https://YOUR-LEADFLOW-API-HOST.example.com/api/v1/internal",
+              "type": "string"
+            },
+            {
+              "id": "32adfa70-0dcb-5f6a-a534-109ca85fb21f",
+              "name": "event_id",
+              "value": "={{ $('Webhook').first().json.body.event_id }}",
+              "type": "string"
+            },
+            {
+              "id": "097d8f64-74ac-5d0e-8945-9f131af05c2f",
+              "name": "lead_id",
+              "value": "={{ $('Webhook').first().json.body.lead_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b7128d24-7b31-547a-8eae-7ba35a7ec437",
+              "name": "correlation_id",
+              "value": "={{ $('Webhook').first().json.body.correlation_id }}",
+              "type": "string"
+            },
+            {
+              "id": "748dd247-167b-53a3-9f94-19db5ffa7be0",
+              "name": "attempt",
+              "value": "={{ Number($('Webhook').first().json.body.attempt) }}",
+              "type": "number"
+            },
+            {
+              "id": "9970e52b-9edb-551a-b9ed-ed3410a6c159",
+              "name": "run_id",
+              "value": "={{ $('Webhook').first().json.body.run_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "9d50cdf3-86c2-5bc2-b061-46ed56cc8faf",
+      "name": "LF Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "**À MODIFIER après import** : `api_base_url` = URL HTTPS de votre API FastAPI + `/api/v1/internal` (sans slash final). Credentials : voir IMPORT_GUIDE.md. Aucun secret n'est stocké dans ce JSON.",
+        "height": 130,
+        "width": 380,
+        "color": 3
+      },
+      "id": "652a55fe-e7ff-56a6-b1b0-3696b85c5a2f",
+      "name": "Note 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        440,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/leads/' + $('LF Config').first().json.lead_id + '/payload' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "event_id",
+              "value": "={{ $('LF Config').first().json.event_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "dbcbe0f0-db45-59d3-93b5-97effd0b66f1",
+      "name": "Get Lead Payload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "754c6da5-afe3-5214-8b8d-e494704eb0b3",
+              "leftValue": "={{ $json.statusCode }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 200
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0269a02c-4576-5530-a224-cc177aab8ce4",
+      "name": "Payload OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bdf2fce5-953b-536f-9b2b-e679d01840aa",
+              "leftValue": "={{ $json.body.already_qualified_for_event }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5542b051-ad97-5852-b531-370b28440405",
+      "name": "Already Qualified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/leads/' + $('LF Config').first().json.lead_id + '/extract' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':extract' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $('LF Config').first().json.event_id }) }}",
+        "options": {
+          "timeout": 110000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "caa7fec6-26ee-5eb0-8d66-becf8693a489",
+      "name": "Extract With LLM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "FastAPI appelle OpenAI (ou le mock). Aucune clé OpenAI n'est présente dans n8n.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "85924190-a101-5806-a4b6-15cd4819c053",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 200
+                  },
+                  {
+                    "id": "d8062ce9-c97e-59d5-928f-d32b73b92a20",
+                    "leftValue": "={{ $json.body.ok }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "extracted"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7da54d71-c8bc-595a-aaa5-a0fe84e09921",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 200
+                  },
+                  {
+                    "id": "60adb26b-722c-5991-8648-065a4b027bb3",
+                    "leftValue": "={{ $json.body.ok }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "manual_review"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "de1f8117-2d76-5f70-9755-084d6a366d9c",
+                    "leftValue": "={{ !$json.statusCode || $json.statusCode >= 500 }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "transient"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "other"
+        }
+      },
+      "id": "3f1c6c02-6e0c-5902-8f36-d8492c46a372",
+      "name": "Classify Extraction",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d47adaff-3786-53d5-956d-8c8e6de46e99",
+              "leftValue": "={{ $json.body.extraction.intent }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "65810cb5-bcf4-5d0a-a27c-d296d1ab4db3",
+              "leftValue": "={{ $json.body.extraction.service }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "6d5e9081-767f-5080-83f9-2549e10fb6bb",
+              "leftValue": "={{ $json.body.extraction.language }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "a4b82aa5-f0f8-5a28-9e4f-a3651faa726f",
+              "leftValue": "={{ $json.body.extraction.need_clarity }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "831af7bb-8b04-50c2-89d4-bc7156fdb611",
+              "leftValue": "={{ $json.body.extraction.summary }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e31e0b45-bb98-5318-82ab-c02be18a5916",
+      "name": "Validate Extraction",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/runs/' + $('LF Config').first().json.run_id + '/status' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':step-validated' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ step: 'extraction_validated', note: 'schema ok' }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "2c30bb35-b939-5ce1-a592-11bd8dcd6ed4",
+      "name": "Log Step: extraction validated",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Journal informatif : un échec ici n'interrompt pas le traitement.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/leads/' + $('LF Config').first().json.lead_id + '/qualification' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':qualify' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $('LF Config').first().json.event_id, extraction: $('Extract With LLM').first().json.body.extraction, provider: $('Extract With LLM').first().json.body.provider, model_name: $('Extract With LLM').first().json.body.model, prompt_version: $('Extract With LLM').first().json.body.prompt_version }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "267095f1-d01b-5dab-bc6c-8955f587f4ea",
+      "name": "Save Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Le score est calculé par FastAPI (règles scoring-v1), jamais par le LLM.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "868b5341-4eff-5023-93fd-9659a78769a0",
+              "leftValue": "={{ $json.statusCode }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 200
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7e6b1c64-e435-5360-8f78-757264e46f8c",
+      "name": "Qualification Saved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/runs/' + $('LF Config').first().json.run_id + '/status' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':step-saved' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ step: 'qualification_saved', note: 'CRM_SYNC_REQUESTED + DRAFT_REQUESTED emitted by backend' }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "e7d8ec6d-a92b-5dde-a655-f117a60a6288",
+      "name": "Log Step: qualification saved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        60
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/outbox/' + $('LF Config').first().json.event_id + '/complete' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':complete' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ attempt: $('LF Config').first().json.attempt, outcome: 'SUCCEEDED', details: { workflow: 'LF-WF-01' } }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "65460ba1-97bf-50ad-a6c9-f79a29c6730a",
+      "name": "Complete Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4a738941-0d5b-5ce0-8ebe-15000059fbd9",
+              "name": "review_error_code",
+              "value": "={{ $json.body.error_code }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "b8bde18e-6e18-5a9e-b3f0-1a9b9ea26e73",
+      "name": "Manual Review: LLM outcome",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e43a9c97-9ed2-52d1-9809-4b051069071b",
+              "name": "review_error_code",
+              "value": "EXTRACTION_INVALID_AT_WORKFLOW",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "8fb476ff-c7fd-5e7b-8a4f-40ea9691625c",
+      "name": "Manual Review: invalid extraction",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/leads/' + $('LF Config').first().json.lead_id + '/manual-review' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':manual' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $('LF Config').first().json.event_id, error_code: $json.review_error_code, detail: 'Qualification automatique impossible : revue humaine requise' }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "046b1e04-0902-5ff1-9eac-671b471c2420",
+      "name": "Mark Manual Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0f6fe55f-7d3a-5c0a-badd-ac98f5aeb8c2",
+              "leftValue": "={{ $json.statusCode }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 200
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "62a1ea2b-c305-5149-bff6-7a884d306d91",
+      "name": "Manual Review Marked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/outbox/' + $('LF Config').first().json.event_id + '/complete' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':complete' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ attempt: $('LF Config').first().json.attempt, outcome: 'MANUAL_REVIEW', details: { workflow: 'LF-WF-01', reason: 'manual_review' } }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "7ee09515-d8c3-556f-9612-a9371bb0ea2a",
+      "name": "Complete (manual review)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        380
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "37746641-fed0-563c-a281-1cdcf0ec6426",
+              "name": "fail_error_code",
+              "value": "={{ 'PAYLOAD_HTTP_' + ($json.statusCode || 'NO_RESPONSE') }}",
+              "type": "string"
+            },
+            {
+              "id": "3a63354d-48da-5df9-87df-3c4c1d78e59e",
+              "name": "fail_retryable",
+              "value": "={{ !$json.statusCode || $json.statusCode >= 500 || $json.statusCode === 429 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "ec6fe251-c0ff-50b3-ac6b-4251b9de787d",
+              "name": "fail_message",
+              "value": "Lecture du lead impossible",
+              "type": "string"
+            },
+            {
+              "id": "43f06d16-2058-5888-b7d7-b115152422e8",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "165cc25a-479c-5734-8118-00e2c36ca189",
+      "name": "Fail: Payload Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2f93f19-4099-540e-844a-ac66263eeed9",
+              "name": "fail_error_code",
+              "value": "={{ $json.body?.error?.code || 'LLM_NO_RESPONSE' }}",
+              "type": "string"
+            },
+            {
+              "id": "1314789a-781b-5596-b25f-b018a2585a77",
+              "name": "fail_retryable",
+              "value": "={{ $json.body?.error?.details?.retryable ?? true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "ecf77eaa-07fc-5107-a622-f2006b1571e5",
+              "name": "fail_message",
+              "value": "Service IA indisponible",
+              "type": "string"
+            },
+            {
+              "id": "03d97221-9d79-5978-8e4f-311c77596777",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "902de953-0248-5067-b70a-c250ffcd18af",
+      "name": "Fail: LLM Transient",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a174456f-7f18-5829-ab6d-e7e139694756",
+              "name": "fail_error_code",
+              "value": "={{ 'EXTRACT_HTTP_' + ($json.statusCode || 'NO_RESPONSE') }}",
+              "type": "string"
+            },
+            {
+              "id": "54898aa5-ebe4-5d45-a1b4-28dcf697522d",
+              "name": "fail_retryable",
+              "value": "={{ false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "10736301-1fb9-580a-97f0-0a0fd6321fa0",
+              "name": "fail_message",
+              "value": "Extraction refusée par le backend",
+              "type": "string"
+            },
+            {
+              "id": "e56f0504-2921-5363-9356-b249a11d8ea4",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "7deb06c2-1dac-57df-81d1-a7beb7e51d87",
+      "name": "Fail: Extraction Rejected",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "335c80c9-89d5-5e64-94e8-39ae95af6016",
+              "name": "fail_error_code",
+              "value": "={{ 'SAVE_HTTP_' + ($json.statusCode || 'NO_RESPONSE') }}",
+              "type": "string"
+            },
+            {
+              "id": "584f9464-6b26-5c6d-ab7d-43145251b343",
+              "name": "fail_retryable",
+              "value": "={{ !$json.statusCode || $json.statusCode >= 500 || $json.statusCode === 429 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "3b8d93c9-cd3f-578b-a8cc-007867e816f6",
+              "name": "fail_message",
+              "value": "Enregistrement impossible",
+              "type": "string"
+            },
+            {
+              "id": "076ed676-25ae-5dca-acc3-cdbb2c1df3a2",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "75981901-5e52-570e-bf61-44b6024eb2ec",
+      "name": "Fail: Save Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2880,
+        520
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "ed9534c5-b873-5d12-b419-c56f65d7f9be",
+      "name": "Failure Info",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3120,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/outbox/' + $('LF Config').first().json.event_id + '/fail' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':fail' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ attempt: $('LF Config').first().json.attempt, error_code: $('Failure Info').first().json.fail_error_code, retryable: $('Failure Info').first().json.fail_retryable, message: $('Failure Info').first().json.fail_message, retry_after_seconds: $('Failure Info').first().json.fail_retry_after || undefined }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "26692ea5-1d7d-59e4-a00b-997dce433451",
+      "name": "Report Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        600
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Le backend applique backoff exponentiel, nombre max de tentatives et dead-letter (autorité unique des retries).",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "content": "**LF-WF-01 — Qualification.** Webhook (secret) → lecture lead → idempotence → extraction (FastAPI→OpenAI) → validation → score serveur → complétion. Refus/JSON invalide → revue manuelle. Panne → /fail (le backend décide du retry).",
+        "height": 170,
+        "width": 420,
+        "color": 7
+      },
+      "id": "ee4cdc98-3bcf-58b4-b864-cec3976d25f1",
+      "name": "Note 27",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        40
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Accepted": {
+      "main": [
+        [
+          {
+            "node": "LF Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LF Config": {
+      "main": [
+        [
+          {
+            "node": "Get Lead Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead Payload": {
+      "main": [
+        [
+          {
+            "node": "Payload OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload OK?": {
+      "main": [
+        [
+          {
+            "node": "Already Qualified?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Payload Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Qualified?": {
+      "main": [
+        [
+          {
+            "node": "Complete Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract With LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract With LLM": {
+      "main": [
+        [
+          {
+            "node": "Classify Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Extraction": {
+      "main": [
+        [
+          {
+            "node": "Validate Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Manual Review: LLM outcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: LLM Transient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Extraction Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Extraction": {
+      "main": [
+        [
+          {
+            "node": "Log Step: extraction validated",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Manual Review: invalid extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Step: extraction validated": {
+      "main": [
+        [
+          {
+            "node": "Save Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Qualification": {
+      "main": [
+        [
+          {
+            "node": "Qualification Saved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qualification Saved?": {
+      "main": [
+        [
+          {
+            "node": "Log Step: qualification saved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Save Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Step: qualification saved": {
+      "main": [
+        [
+          {
+            "node": "Complete Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Review: LLM outcome": {
+      "main": [
+        [
+          {
+            "node": "Mark Manual Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Review: invalid extraction": {
+      "main": [
+        [
+          {
+            "node": "Mark Manual Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Manual Review": {
+      "main": [
+        [
+          {
+            "node": "Manual Review Marked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Review Marked?": {
+      "main": [
+        [
+          {
+            "node": "Complete (manual review)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Save Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Payload Error": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: LLM Transient": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Extraction Rejected": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Save Error": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Failure Info": {
+      "main": [
+        [
+          {
+            "node": "Report Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "executionTimeout": 600
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Événement LEAD_SUBMITTED -> extraction OpenAI (via FastAPI) -> score serveur -> qualification persistée."
+  },
+  "tags": []
+}

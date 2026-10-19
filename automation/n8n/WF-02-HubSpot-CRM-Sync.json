@@ -1,0 +1,2470 @@
+{
+  "name": "LF-WF-02 HubSpot CRM Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lf-wf-02-crm-sync",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "19c4dd0d-7dec-5b03-bc12-47b42435198c",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_N8N_WEBHOOK_SECRET",
+          "name": "LF - n8n Webhook Secret"
+        }
+      },
+      "webhookId": "db6a500e-c7fa-5809-8d45-4776f3f277ee",
+      "notes": "Appelé UNIQUEMENT par LF-WF-04 (secret d'en-tête). Corps = événement réservé par le backend.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ accepted: true, event_id: $json.body.event_id }) }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "a8c94447-1b92-582b-a49c-5196b10d4292",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Accusé de réception seulement : HTTP 202 ne signifie PAS que le traitement métier est terminé.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6169f97a-03ba-59ba-9009-8dbed8111b30",
+              "name": "api_base_url",
+              "value": "https://YOUR-LEADFLOW-API-HOST.example.com/api/v1/internal",
+              "type": "string"
+            },
+            {
+              "id": "f63194e2-ef6f-5618-b5f3-37c292f39971",
+              "name": "event_id",
+              "value": "={{ $('Webhook').first().json.body.event_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b23ec45a-da0e-5436-a935-accea5db2618",
+              "name": "lead_id",
+              "value": "={{ $('Webhook').first().json.body.lead_id }}",
+              "type": "string"
+            },
+            {
+              "id": "bb520467-24f8-5020-9a33-2e5aef00e07a",
+              "name": "correlation_id",
+              "value": "={{ $('Webhook').first().json.body.correlation_id }}",
+              "type": "string"
+            },
+            {
+              "id": "58b84a19-e894-5a9e-906b-6d0b1f5eaf37",
+              "name": "attempt",
+              "value": "={{ Number($('Webhook').first().json.body.attempt) }}",
+              "type": "number"
+            },
+            {
+              "id": "a2ccde0b-0db5-50b4-8d29-125d745303ea",
+              "name": "run_id",
+              "value": "={{ $('Webhook').first().json.body.run_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "f49836c2-062c-584a-bb3a-4cc17a7c78ff",
+      "name": "LF Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "**À MODIFIER après import** : `api_base_url` = URL HTTPS de votre API FastAPI + `/api/v1/internal` (sans slash final). Credentials : voir IMPORT_GUIDE.md. Aucun secret n'est stocké dans ce JSON.",
+        "height": 130,
+        "width": 380,
+        "color": 3
+      },
+      "id": "91528e7f-2996-53cd-8b51-9b57d3944e24",
+      "name": "Note 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        440,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/leads/' + $('LF Config').first().json.lead_id + '/crm-context' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a8c98d04-63e3-5e92-bd94-7c465e4615f2",
+      "name": "Get CRM Context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8878bc4c-9e13-55d2-ba74-766b053aa335",
+              "leftValue": "={{ $json.statusCode }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 200
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e408629a-bcd2-572c-82d2-785599414478",
+      "name": "Context OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7087e62f-290c-553d-a032-c6e2fdab4066",
+                    "leftValue": "={{ $json.body.provider }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "mock"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "mock"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "06c39ded-cadf-5086-b61e-2cc6be538972",
+                    "leftValue": "={{ $json.body.provider }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "hubspot"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "hubspot"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "other"
+        }
+      },
+      "id": "64afc336-208d-59a9-afe7-9f7ab734a31a",
+      "name": "Route By CRM_PROVIDER",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/leads/' + $('LF Config').first().json.lead_id + '/crm/mock-upsert' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':mock-upsert' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $('LF Config').first().json.event_id }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "08662c18-1cbe-5d61-a36e-516ba2a589e9",
+      "name": "Mock CRM Upsert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "CRM factice côté FastAPI : recherche + création/mise à jour idempotentes, sans credentials HubSpot.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "27782c45-060b-5666-92d2-c5e4aced0a35",
+              "leftValue": "={{ $json.statusCode }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 200
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dee17952-4007-58b1-83dc-ae355b2c993a",
+      "name": "Mock Upsert OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ecfb2a71-c816-51ce-91a5-02b1ba61fbe2",
+              "name": "sync_provider",
+              "value": "mock",
+              "type": "string"
+            },
+            {
+              "id": "d9ce9ae4-a0f2-5c60-9c9f-cb6463f79fe3",
+              "name": "sync_external_id",
+              "value": "={{ $json.body.external_contact_id }}",
+              "type": "string"
+            },
+            {
+              "id": "50848130-6a3b-51f1-9fd6-763c84293409",
+              "name": "sync_action",
+              "value": "={{ $json.body.action }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "85f01e63-0c98-514b-9cc9-dd5c871add98",
+      "name": "Prepare Sync Result (mock)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8b74c0ac-d5bf-5572-8bbd-9adaefa44b0a",
+              "leftValue": "={{ $('Get CRM Context').first().json.body.mapping?.external_contact_id || '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ad5ccbf7-8441-5d1b-8065-5335e133b2ec",
+      "name": "Known External ID?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4e681d4f-72db-5df6-a7b0-7b23efa372a6",
+              "name": "hs_contact_id",
+              "value": "={{ $('Get CRM Context').first().json.body.mapping.external_contact_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "199e4bdd-ba1a-5052-8844-5f61ed4b5de7",
+      "name": "Prepare Update (known id)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1680,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: $('Get CRM Context').first().json.body.contact.email_normalized }] }], properties: ['email','firstname','lastname','company','phone'], limit: 1 }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a368ffa1-2a96-5b44-a897-359ac1876d4d",
+      "name": "HubSpot: Search Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        520
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "LF_CRED_HUBSPOT_TOKEN",
+          "name": "LF - HubSpot Private App Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Recherche par e-mail normalisé AVANT toute création : réconcilie un succès dont la réponse s'est perdue (timeout).",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c6c6b582-431c-5661-904e-023d46c16ee4",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 200
+                  },
+                  {
+                    "id": "61e2bce0-90f3-5419-bc67-6b041d5bd360",
+                    "leftValue": "={{ $json.body.total }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    },
+                    "rightValue": 0
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "found"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "aed27d70-350d-58b1-a2da-88503aa52fe1",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 200
+                  },
+                  {
+                    "id": "e0de3c56-c72f-5910-89a5-656233e56ab6",
+                    "leftValue": "={{ $json.body.total }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 0
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "not_found"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f2c6ccf8-afb0-59a4-be17-5f97684d04f3",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 429
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "rate_limited"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3eb27a03-2387-5034-9300-aa39c8666d82",
+                    "leftValue": "={{ [401, 403].includes($json.statusCode) }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "auth_error"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c9f404a9-6831-5b88-8bf1-9daf2722b7bf",
+                    "leftValue": "={{ !$json.statusCode || $json.statusCode >= 500 }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "transient"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "other"
+        }
+      },
+      "id": "77d6c349-0069-54fe-89b5-66475ae773fd",
+      "name": "Classify Search",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1920,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5af19a19-4895-5c02-bcee-d765ed08602c",
+              "name": "hs_contact_id",
+              "value": "={{ $json.body.results[0].id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "b36208e1-510d-5190-b721-a975baf7dcf1",
+      "name": "Prepare Update (from search)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2160,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/contacts/' + $json.hs_contact_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { email: $('Get CRM Context').first().json.body.contact.email_normalized, firstname: $('Get CRM Context').first().json.body.contact.full_name.split(' ')[0], lastname: $('Get CRM Context').first().json.body.contact.full_name.split(' ').slice(1).join(' ') || undefined, company: $('Get CRM Context').first().json.body.contact.company || undefined, phone: $('Get CRM Context').first().json.body.contact.phone || undefined } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "66c3df78-ca58-50c4-97ba-ee0e2ca7f498",
+      "name": "HubSpot: Update Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        400
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "LF_CRED_HUBSPOT_TOKEN",
+          "name": "LF - HubSpot Private App Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "190b468b-1f78-5547-bd31-4477fc66d633",
+                    "leftValue": "={{ [200, 201].includes($json.statusCode) }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ok"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4a90c387-955d-59e4-8da3-c5704f95bd6b",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 429
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "rate_limited"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4c04efe4-26ba-5aba-abaa-1cdbfaaf55c8",
+                    "leftValue": "={{ [401, 403].includes($json.statusCode) }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "auth_error"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "44f26411-6ec4-5401-b05a-337e3f9b40de",
+                    "leftValue": "={{ !$json.statusCode || $json.statusCode >= 500 }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "transient"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "other"
+        }
+      },
+      "id": "98afc799-a9ce-58ed-a8ff-e2314706a5a6",
+      "name": "Classify Update",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2640,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { email: $('Get CRM Context').first().json.body.contact.email_normalized, firstname: $('Get CRM Context').first().json.body.contact.full_name.split(' ')[0], lastname: $('Get CRM Context').first().json.body.contact.full_name.split(' ').slice(1).join(' ') || undefined, company: $('Get CRM Context').first().json.body.contact.company || undefined, phone: $('Get CRM Context').first().json.body.contact.phone || undefined } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "f2c732cb-5c46-5525-b9b3-e274c55fc208",
+      "name": "HubSpot: Create Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        600
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "LF_CRED_HUBSPOT_TOKEN",
+          "name": "LF - HubSpot Private App Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "de4af4f8-b435-587e-b849-18a695890588",
+                    "leftValue": "={{ [200, 201].includes($json.statusCode) }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ok"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "311772b6-2cdf-52a7-84ed-80e2dc7594f9",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 409
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "already_exists"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9a6782c9-04c7-5585-b78e-c598e321db19",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 429
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "rate_limited"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a9cc6e23-309e-5e78-a1cd-29e7024b7843",
+                    "leftValue": "={{ [401, 403].includes($json.statusCode) }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "auth_error"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "172eec51-773c-5363-9dd8-d7ab10aacaf2",
+                    "leftValue": "={{ !$json.statusCode || $json.statusCode >= 500 }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "transient"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "other"
+        }
+      },
+      "id": "6ade6304-b80f-55ea-8a70-67be3a69f35a",
+      "name": "Classify Create",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2640,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cb7ff84b-7a54-5630-a8e3-4f5770a71470",
+              "name": "hs_contact_id",
+              "value": "={{ (String($json.body.message || '').match(/Existing ID: (\\d+)/) || [])[1] || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "9dc070c1-c97d-56d0-b593-bf26127abf07",
+      "name": "Reconcile Existing Contact",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2880,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "19da933d-0fc9-5ef2-a3ba-942bdaa9e12f",
+              "leftValue": "={{ $json.hs_contact_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "13203c45-3f2c-52e8-945a-1a8c018b1829",
+      "name": "Reconciled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3120,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b8bddd4a-2180-5952-8295-a65719f806e9",
+              "name": "sync_provider",
+              "value": "hubspot",
+              "type": "string"
+            },
+            {
+              "id": "8dd2dcf4-3352-54db-acbe-8519486c4197",
+              "name": "sync_external_id",
+              "value": "={{ String($json.body.id) }}",
+              "type": "string"
+            },
+            {
+              "id": "36115a9a-f456-56c4-a792-df04a328cab3",
+              "name": "sync_action",
+              "value": "updated",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "3cc552cf-770d-540c-b342-f947488dc932",
+      "name": "Prepare Result (hubspot update)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2880,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c90d1689-a62d-5c38-96b5-ec0f53f5089b",
+              "name": "sync_provider",
+              "value": "hubspot",
+              "type": "string"
+            },
+            {
+              "id": "8907b281-4e25-53fd-a0be-2061f1dc3e50",
+              "name": "sync_external_id",
+              "value": "={{ String($json.body.id) }}",
+              "type": "string"
+            },
+            {
+              "id": "e6958af1-f8a1-50d9-9655-1eb93e8e0580",
+              "name": "sync_action",
+              "value": "created",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "38e8ac6d-e818-5cd8-8124-3c377ee02679",
+      "name": "Prepare Result (hubspot create)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2880,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/leads/' + $('LF Config').first().json.lead_id + '/crm-sync' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':crm-record' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $('LF Config').first().json.event_id, provider: $json.sync_provider, status: 'SYNCED', external_contact_id: $json.sync_external_id, action: $json.sync_action }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "13b6ed02-4c76-5d62-87e2-fcb76b730177",
+      "name": "Record CRM Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b4a1d4c4-c7fa-52a7-a3af-2dae82f9134d",
+              "leftValue": "={{ $json.statusCode }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 200
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "eab3bae8-61c1-5d11-93d6-c99fdc5a9b36",
+      "name": "Sync Recorded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/outbox/' + $('LF Config').first().json.event_id + '/complete' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':complete' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ attempt: $('LF Config').first().json.attempt, outcome: 'SUCCEEDED', details: { workflow: 'LF-WF-02' } }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "47779b59-cc91-545a-9364-891d0fd8d9f1",
+      "name": "Complete Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3840,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae18154e-ecbd-5b47-b600-d7d2f445ca05",
+              "name": "fail_error_code",
+              "value": "={{ 'CONTEXT_HTTP_' + ($json.statusCode || 'NO_RESPONSE') }}",
+              "type": "string"
+            },
+            {
+              "id": "7128227b-5549-5570-97fe-39213b402fc0",
+              "name": "fail_retryable",
+              "value": "={{ !$json.statusCode || $json.statusCode >= 500 || $json.statusCode === 429 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c2f0c82a-bcbc-5d55-a2cb-feae0256d4ca",
+              "name": "fail_message",
+              "value": "Contexte CRM illisible",
+              "type": "string"
+            },
+            {
+              "id": "aa729544-adfc-59ee-bba7-d359fa888d17",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "43a838c3-511d-5318-9fb4-eab6f2ffecfb",
+              "name": "fail_record_crm",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "726ba9c0-0044-5450-8eba-11b4cb10b4f4",
+      "name": "Fail: Context Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8b8a9ff5-1dda-5424-bc63-e88dca18cc39",
+              "name": "fail_error_code",
+              "value": "UNKNOWN_CRM_PROVIDER",
+              "type": "string"
+            },
+            {
+              "id": "410c7fdf-0529-57de-bcb4-98ac51cb1e77",
+              "name": "fail_retryable",
+              "value": "={{ false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "a0d27a77-e507-599f-b364-2a380f87dbc1",
+              "name": "fail_message",
+              "value": "CRM_PROVIDER inconnu",
+              "type": "string"
+            },
+            {
+              "id": "79eaefb8-6f09-577b-b9e2-49b5513f2052",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "097201ca-cf26-5c50-9885-17b760e45b68",
+              "name": "fail_record_crm",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "a2894afe-7f2a-52da-8d6d-419ca5c08f23",
+      "name": "Fail: Unknown Provider",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dce94d3e-1fcf-5acd-8c0a-7604a691c5ae",
+              "name": "fail_error_code",
+              "value": "={{ 'MOCK_CRM_HTTP_' + ($json.statusCode || 'NO_RESPONSE') }}",
+              "type": "string"
+            },
+            {
+              "id": "2fc71fb9-ce99-5539-8167-25c0d5cf3f25",
+              "name": "fail_retryable",
+              "value": "={{ !$json.statusCode || $json.statusCode >= 500 || $json.statusCode === 429 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "a93a694d-a035-52b3-9a9c-4623094dc09d",
+              "name": "fail_message",
+              "value": "CRM factice en erreur",
+              "type": "string"
+            },
+            {
+              "id": "7f92905e-fc07-56f9-ac79-833a1948aa7b",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "bae475f0-eb3a-5a09-ad71-b72b711fd119",
+              "name": "fail_record_crm",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "0214f1c6-935e-59a8-8e38-52c71263260d",
+      "name": "Fail: Mock CRM Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1680,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b694115-284f-54e1-9ee6-4da4d56f08fb",
+              "name": "fail_error_code",
+              "value": "HUBSPOT_RATE_LIMITED",
+              "type": "string"
+            },
+            {
+              "id": "271eb203-b2c3-50e1-b0b6-b5740db8725d",
+              "name": "fail_retryable",
+              "value": "={{ true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "2a9c497a-b846-5156-a074-856ced42706d",
+              "name": "fail_message",
+              "value": "HubSpot 429 : limite de débit",
+              "type": "string"
+            },
+            {
+              "id": "d4e95389-9821-509a-9c8d-fd466e4d3148",
+              "name": "fail_retry_after",
+              "value": "={{ Number($json.headers?.['retry-after']) || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "7a106903-9458-5932-bb1d-28a78954fd9f",
+              "name": "fail_record_crm",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "64332ab3-10e4-5e51-8ea8-ea8fe4f7848f",
+      "name": "Fail: Rate Limited",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2160,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8726281c-b2b7-50c8-b974-4fa8450d2be0",
+              "name": "fail_error_code",
+              "value": "={{ 'HUBSPOT_AUTH_' + ($json.statusCode || 'NO_RESPONSE') }}",
+              "type": "string"
+            },
+            {
+              "id": "fc7499fd-973d-56dd-a117-38db7ba454cc",
+              "name": "fail_retryable",
+              "value": "={{ false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c8ad13f1-5303-58f0-b65e-e00358a1c1ef",
+              "name": "fail_message",
+              "value": "401/403 : vérifier le credential HubSpot (configuration, pas une panne passagère)",
+              "type": "string"
+            },
+            {
+              "id": "85d3fe09-3d36-58ec-994e-d936d26d4a9f",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "20cc98a4-eb1d-5e43-9870-7a470a174c16",
+              "name": "fail_record_crm",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "17bae5c4-3196-5ed2-b6f0-e5fd556fc0c2",
+      "name": "Fail: Auth Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2400,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "942ed4b2-5dbe-51e9-9296-7a7c2441d4b2",
+              "name": "fail_error_code",
+              "value": "={{ $json.statusCode ? 'HUBSPOT_HTTP_' + $json.statusCode : 'HUBSPOT_NETWORK_TIMEOUT' }}",
+              "type": "string"
+            },
+            {
+              "id": "07fab7a2-6a06-57cd-b995-c54c6f69a2c3",
+              "name": "fail_retryable",
+              "value": "={{ true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "279b736d-5445-5f4c-943a-2e6cd5d76a2f",
+              "name": "fail_message",
+              "value": "Erreur serveur ou timeout : reprise sûre (recherche avant création)",
+              "type": "string"
+            },
+            {
+              "id": "788437fd-5276-5364-a8af-92d8c42bdd3d",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "f3f2f187-cd61-5d78-9478-fef3f7a0673b",
+              "name": "fail_record_crm",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "686c1ec5-bedc-5958-a261-58f68df9c647",
+      "name": "Fail: Transient",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2640,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "333bdd42-e2bc-55c6-a1e3-00668e30c2ee",
+              "name": "fail_error_code",
+              "value": "={{ 'HUBSPOT_HTTP_' + ($json.statusCode || 'NO_RESPONSE') }}",
+              "type": "string"
+            },
+            {
+              "id": "18259dda-3dd4-51bd-aeaf-fc5294bd68a4",
+              "name": "fail_retryable",
+              "value": "={{ false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "28b33c44-10c3-580c-adb1-174fe4c45107",
+              "name": "fail_message",
+              "value": "Requête HubSpot refusée (4xx)",
+              "type": "string"
+            },
+            {
+              "id": "6c4f60ef-98f4-5838-83eb-efeac1534ba2",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "f989fae7-8d3d-5633-9d33-7d664c668c36",
+              "name": "fail_record_crm",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "8748f2f6-25f0-5d69-a8d6-7059e2dcf33b",
+      "name": "Fail: Client Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2880,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b9f9a8e9-5517-5088-877c-bb3ec7f5a789",
+              "name": "fail_error_code",
+              "value": "HUBSPOT_CONFLICT_UNRESOLVED",
+              "type": "string"
+            },
+            {
+              "id": "50943b95-b5bd-5356-a008-5b553c997e64",
+              "name": "fail_retryable",
+              "value": "={{ true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "711d8dd1-7e9c-5e52-b2ae-4f9052f31db1",
+              "name": "fail_message",
+              "value": "Contact existant non identifiable : la prochaine tentative le retrouvera par recherche",
+              "type": "string"
+            },
+            {
+              "id": "5fbd9824-e9f6-5814-83b3-df543295c33c",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "f2515b5c-dd54-5c76-bc36-9c8333b14418",
+              "name": "fail_record_crm",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "8b2f5ef5-b64f-5874-8553-e620c857c315",
+      "name": "Fail: Conflict Unresolved",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3120,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5d7e251f-93e4-57f1-8933-5db84b522733",
+              "name": "fail_error_code",
+              "value": "={{ 'RECORD_HTTP_' + ($json.statusCode || 'NO_RESPONSE') }}",
+              "type": "string"
+            },
+            {
+              "id": "fa3799b6-80aa-552e-8a6b-889892703b0c",
+              "name": "fail_retryable",
+              "value": "={{ !$json.statusCode || $json.statusCode >= 500 || $json.statusCode === 429 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "8aaed96b-d30b-5d82-b768-90c0af326b7d",
+              "name": "fail_message",
+              "value": "Résultat CRM non enregistré",
+              "type": "string"
+            },
+            {
+              "id": "dc73c73e-5210-5127-94bb-806b40f58de0",
+              "name": "fail_retry_after",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "32f4ea52-7c30-5904-aeae-7a5f4a0e98c0",
+              "name": "fail_record_crm",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "ea14f6c7-979a-5733-826e-284cff421025",
+      "name": "Fail: Record Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3600,
+        420
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "7c1848c4-33c0-5da3-ba0e-447a3f82901f",
+      "name": "Failure Info",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b25b2af7-c4c5-50c7-a8b1-030c64ca0c6d",
+              "leftValue": "={{ $json.fail_record_crm }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "675897b5-19b2-5693-816d-92fcf0d66439",
+      "name": "Record CRM State?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/leads/' + $('LF Config').first().json.lead_id + '/crm-sync' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':crm-failure' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $('LF Config').first().json.event_id, provider: $('Get CRM Context').first().json.body.provider, status: $('Failure Info').first().json.fail_retryable ? 'RETRYING' : 'FAILED', error_code: $('Failure Info').first().json.fail_error_code }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "e5699e53-8b18-57ad-a834-0babfaa9ac00",
+      "name": "Record CRM Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3840,
+        840
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Rend l'état CRM visible dans le dashboard (RETRYING / FAILED) avant de rapporter l'échec.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/outbox/' + $('LF Config').first().json.event_id + '/fail' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('LF Config').first().json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('LF Config').first().json.event_id + ':' + $('LF Config').first().json.attempt + ':fail' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ attempt: $('LF Config').first().json.attempt, error_code: $('Failure Info').first().json.fail_error_code, retryable: $('Failure Info').first().json.fail_retryable, message: $('Failure Info').first().json.fail_message, retry_after_seconds: $('Failure Info').first().json.fail_retry_after || undefined }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "3e0dc894-d865-5ede-be5c-8dd031f2d232",
+      "name": "Report Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4080,
+        900
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Le backend applique backoff exponentiel, nombre max de tentatives et dead-letter (autorité unique des retries).",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "content": "**LF-WF-02 — CRM.** Le mode (mock | hubspot) vient du backend (`CRM_PROVIDER`). Mode hubspot : recherche par e-mail → mise à jour OU création ; 409 « déjà existant » → réconciliation ; 429/401/403/5xx/timeout → /fail (retry décidé par le backend). Credential HubSpot requis UNIQUEMENT en mode hubspot (Private App, scope crm.objects.contacts.read/write).",
+        "height": 190,
+        "width": 520,
+        "color": 7
+      },
+      "id": "e30abb89-9a3a-5798-b23b-e8943fe7dbb8",
+      "name": "Note 40",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        40
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Accepted": {
+      "main": [
+        [
+          {
+            "node": "LF Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LF Config": {
+      "main": [
+        [
+          {
+            "node": "Get CRM Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get CRM Context": {
+      "main": [
+        [
+          {
+            "node": "Context OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context OK?": {
+      "main": [
+        [
+          {
+            "node": "Route By CRM_PROVIDER",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Context Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By CRM_PROVIDER": {
+      "main": [
+        [
+          {
+            "node": "Mock CRM Upsert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Known External ID?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Unknown Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock CRM Upsert": {
+      "main": [
+        [
+          {
+            "node": "Mock Upsert OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Upsert OK?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Sync Result (mock)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Mock CRM Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Sync Result (mock)": {
+      "main": [
+        [
+          {
+            "node": "Record CRM Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Known External ID?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Update (known id)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HubSpot: Search Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Update (known id)": {
+      "main": [
+        [
+          {
+            "node": "HubSpot: Update Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot: Search Contact": {
+      "main": [
+        [
+          {
+            "node": "Classify Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Search": {
+      "main": [
+        [
+          {
+            "node": "Prepare Update (from search)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HubSpot: Create Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Rate Limited",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Auth Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Transient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Client Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Update (from search)": {
+      "main": [
+        [
+          {
+            "node": "HubSpot: Update Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot: Update Contact": {
+      "main": [
+        [
+          {
+            "node": "Classify Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Update": {
+      "main": [
+        [
+          {
+            "node": "Prepare Result (hubspot update)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Rate Limited",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Auth Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Transient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Client Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot: Create Contact": {
+      "main": [
+        [
+          {
+            "node": "Classify Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Create": {
+      "main": [
+        [
+          {
+            "node": "Prepare Result (hubspot create)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reconcile Existing Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Rate Limited",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Auth Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Transient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Client Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Existing Contact": {
+      "main": [
+        [
+          {
+            "node": "Reconciled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconciled?": {
+      "main": [
+        [
+          {
+            "node": "HubSpot: Update Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Conflict Unresolved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Result (hubspot update)": {
+      "main": [
+        [
+          {
+            "node": "Record CRM Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Result (hubspot create)": {
+      "main": [
+        [
+          {
+            "node": "Record CRM Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record CRM Sync": {
+      "main": [
+        [
+          {
+            "node": "Sync Recorded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync Recorded?": {
+      "main": [
+        [
+          {
+            "node": "Complete Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Record Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Context Error": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Unknown Provider": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Mock CRM Error": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Rate Limited": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Auth Error": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Transient": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Client Error": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Conflict Unresolved": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Record Error": {
+      "main": [
+        [
+          {
+            "node": "Failure Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Failure Info": {
+      "main": [
+        [
+          {
+            "node": "Record CRM State?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record CRM State?": {
+      "main": [
+        [
+          {
+            "node": "Record CRM Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record CRM Failure": {
+      "main": [
+        [
+          {
+            "node": "Report Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "executionTimeout": 600
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Événement CRM_SYNC_REQUESTED -> CRM_PROVIDER (mock | hubspot) -> upsert idempotent -> résultat enregistré."
+  },
+  "tags": []
+}

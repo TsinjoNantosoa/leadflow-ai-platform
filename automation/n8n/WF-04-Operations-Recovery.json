@@ -1,0 +1,842 @@
+{
+  "name": "LF-WF-04 Operations Recovery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "d07cb91f-7fe1-575a-8fee-403fe552cf08",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "notes": "Toutes les minutes. Le backend Render peut dormir : le premier appel réveille le service (timeout 90 s).",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {},
+      "id": "2ec23e34-23c6-5e9d-8fd3-edd1dea3134c",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        480
+      ],
+      "notes": "Lancement manuel pour tester / reprendre immédiatement.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3086704d-c82a-5d45-93a9-6608d1b1c616",
+              "name": "api_base_url",
+              "value": "https://YOUR-LEADFLOW-API-HOST.example.com/api/v1/internal",
+              "type": "string"
+            },
+            {
+              "id": "f245e3d7-8c22-5527-832d-b9ed9a63b9ab",
+              "name": "n8n_base_url",
+              "value": "http://localhost:5678",
+              "type": "string"
+            },
+            {
+              "id": "0c1ae4d7-0905-5d87-b769-8bf331fa8b51",
+              "name": "claim_limit",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "300539dc-0338-553e-937b-868ae5d8c96d",
+              "name": "worker_name",
+              "value": "n8n-ovh",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "712d1672-6290-5b18-b8de-da385d60439d",
+      "name": "LF Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "content": "**À MODIFIER après import** : `api_base_url` (API FastAPI + /api/v1/internal) et `n8n_base_url` (URL de CETTE instance n8n, ex. http://localhost:5678 si WF-04 appelle ses propres webhooks en local). Voir IMPORT_GUIDE.md.",
+        "height": 120,
+        "width": 400,
+        "color": 3
+      },
+      "id": "1ce79da4-ad97-504b-97fb-731ade13d671",
+      "name": "Note 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/outbox/claim' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limit: $('LF Config').first().json.claim_limit, worker: $('LF Config').first().json.worker_name }) }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "18cd323a-6a23-5818-977b-47efbdf09dd9",
+      "name": "Claim Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        380
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Réservation atomique (SKIP LOCKED) avec lease. Les événements dont la lease a expiré (crash) sont repris automatiquement.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0c6a914c-faea-5c0a-aad0-acd893352294",
+              "leftValue": "={{ $json.statusCode }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 200
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "eb1ed6e1-74eb-5bb1-9d43-9dafd25fbe76",
+      "name": "Claim OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        380
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "7d27bab5-db5c-5e74-8a6a-d644e3a3b384",
+      "name": "Backend Unreachable (next run retries)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        960,
+        560
+      ],
+      "notes": "Aucune action : l'outbox est persistante, la prochaine exécution réessaiera.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.events",
+        "options": {}
+      },
+      "id": "35e185a0-1867-56bc-81d6-e3d4079b9a82",
+      "name": "Split Events",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6c14f2ed-05d0-581f-a8a5-b1c940189b1b",
+                    "leftValue": "={{ $json.event_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "LEAD_SUBMITTED"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "LEAD_SUBMITTED"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ff07466a-7955-59fa-b160-92edd9d6611b",
+                    "leftValue": "={{ $json.event_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "CRM_SYNC_REQUESTED"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CRM_SYNC_REQUESTED"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "72cd6ff9-7979-5753-98bd-96c01031328d",
+                    "leftValue": "={{ $json.event_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "DRAFT_REQUESTED"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "DRAFT_REQUESTED"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "other"
+        }
+      },
+      "id": "d6cb6342-6c1d-5d04-9d93-2092117d569b",
+      "name": "Route By Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.n8n_base_url + '/webhook/lf-wf-01-lead-qualification' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Split Events').item.json) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "522d16ce-1cd7-52b4-8556-4ba45d833705",
+      "name": "Dispatch LF-WF-01",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_N8N_WEBHOOK_SECRET",
+          "name": "LF - n8n Webhook Secret"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Appel du workflow enfant (accusé 202 immédiat). Le workflow enfant rapporte lui-même complete/fail au backend.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.n8n_base_url + '/webhook/lf-wf-02-crm-sync' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Split Events').item.json) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "9f526fd6-a57b-5d10-831f-b6b7b54da89e",
+      "name": "Dispatch LF-WF-02",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_N8N_WEBHOOK_SECRET",
+          "name": "LF - n8n Webhook Secret"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Appel du workflow enfant (accusé 202 immédiat). Le workflow enfant rapporte lui-même complete/fail au backend.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.n8n_base_url + '/webhook/lf-wf-03-followup-draft' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Split Events').item.json) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a3c1fc52-c053-5de2-b297-13a049be5e10",
+      "name": "Dispatch LF-WF-03",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        440
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_N8N_WEBHOOK_SECRET",
+          "name": "LF - n8n Webhook Secret"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Appel du workflow enfant (accusé 202 immédiat). Le workflow enfant rapporte lui-même complete/fail au backend.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e0a98485-ceea-5346-85aa-7f0774d9fe63",
+              "leftValue": "={{ $json.statusCode >= 200 && $json.statusCode < 300 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b32798f7-c850-56ad-994f-d72be0ee61c3",
+      "name": "Dispatch Accepted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "fd392df5-1950-574d-8ede-c57e1ef17c31",
+      "name": "Dispatched",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/outbox/' + $('Split Events').item.json.event_id + '/fail' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('Split Events').item.json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('Split Events').item.json.event_id + ':' + $('Split Events').item.json.attempt + ':dispatch-fail' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ attempt: $('Split Events').item.json.attempt, error_code: 'N8N_DISPATCH_FAILED', retryable: true, message: 'Workflow enfant injoignable ou inactif (HTTP ' + ($json.statusCode || 'timeout') + ')' }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "10ca19a5-ea05-58ae-b78c-1d47e61195a6",
+      "name": "Report Dispatch Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        380
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Le backend planifie le retry (backoff) ou la dead-letter ; aucun second système de retry dans n8n.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('LF Config').first().json.api_base_url + '/outbox/' + $json.event_id + '/fail' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-LF-Timestamp",
+              "value": "={{ Date.now() }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $json.correlation_id }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.event_id + ':' + $json.attempt + ':unknown-type' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ attempt: $json.attempt, error_code: 'UNKNOWN_EVENT_TYPE', retryable: false, message: $json.event_type }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "5a79d6db-64c4-5d81-b7c3-82c24fdcf695",
+      "name": "Report Unknown Event Type",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        620
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_API_SERVICE_TOKEN",
+          "name": "LF - LeadFlow API Service Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "eae86d7e-6585-5e95-ae64-ae22da1cfacc",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        800
+      ],
+      "notes": "Désigner ce workflow comme « Error workflow » dans les réglages de LF-WF-01/02/03.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ba5480da-f701-552a-9b71-500ffec03176",
+              "name": "alert_workflow",
+              "value": "={{ $json.workflow.name }}",
+              "type": "string"
+            },
+            {
+              "id": "92eceff1-1ac4-5a35-9221-732b68015ab4",
+              "name": "alert_execution_id",
+              "value": "={{ $json.execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "09e05f48-6b97-5c9b-b2e5-acb5bf4f5a2f",
+              "name": "alert_node",
+              "value": "={{ $json.execution.lastNodeExecuted }}",
+              "type": "string"
+            },
+            {
+              "id": "1105681e-5e56-5a96-a314-ea76a0b83ef1",
+              "name": "alert_message",
+              "value": "={{ $json.execution.error.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "ba4cff8b-7e56-50c0-9d88-ec9d8905e9df",
+      "name": "Format Alert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        800
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "3530c79a-fc00-577a-8871-7f5322279a9e",
+      "name": "Alert Placeholder (connect Slack / e-mail interne)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        800
+      ],
+      "notes": "Brancher ici une notification INTERNE (jamais un e-mail commercial). Le backend reste la source de vérité des états.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "content": "**LF-WF-04 — Opérations.** Planifié : réserve les événements prêts (lease) → route vers WF-01/02/03 → enregistre les erreurs. Le backend est l'unique autorité des tentatives (backoff, max, dead-letter). Reprise manuelle : bouton du dashboard (« Reprise manuelle ») puis prochaine exécution, ou lancer ce workflow à la main.",
+        "height": 150,
+        "width": 520,
+        "color": 7
+      },
+      "id": "20c7aad6-ce4a-580d-b40e-59e465d4b643",
+      "name": "Note 20",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        40
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "LF Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "LF Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LF Config": {
+      "main": [
+        [
+          {
+            "node": "Claim Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Events": {
+      "main": [
+        [
+          {
+            "node": "Claim OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim OK?": {
+      "main": [
+        [
+          {
+            "node": "Split Events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Backend Unreachable (next run retries)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Events": {
+      "main": [
+        [
+          {
+            "node": "Route By Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Event Type": {
+      "main": [
+        [
+          {
+            "node": "Dispatch LF-WF-01",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dispatch LF-WF-02",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dispatch LF-WF-03",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Unknown Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch LF-WF-01": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch LF-WF-02": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch LF-WF-03": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Accepted?": {
+      "main": [
+        [
+          {
+            "node": "Dispatched",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Dispatch Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [
+          {
+            "node": "Alert Placeholder (connect Slack / e-mail interne)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "executionTimeout": 600
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Planification : réserve les événements outbox prêts (lease) et les route vers WF-01/02/03. Reprise après crash."
+  },
+  "tags": []
+}

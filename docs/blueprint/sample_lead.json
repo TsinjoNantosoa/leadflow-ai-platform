@@ -1,0 +1,8 @@
+{
+  "full_name": "Alice Martin",
+  "email": "alice.martin@example.org",
+  "company": "NovaDigital Demo",
+  "requested_service": "customer_support_automation",
+  "message": "Bonjour, notre équipe veut automatiser le traitement des demandes clients. Budget indicatif 3000 EUR. Démarrage dans un mois.",
+  "consent_status": "granted"
+}

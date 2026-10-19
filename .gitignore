@@ -1,0 +1,28 @@
+# secrets / env
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# node
+node_modules/
+dist/
+.vite/
+coverage/
+playwright-report/
+test-results/
+
+# misc
+.DS_Store
+*.log
+.vercel/

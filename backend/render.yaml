@@ -1,0 +1,54 @@
+# Blueprint Render (Infrastructure as Code). À utiliser tel quel depuis un dépôt Git contenant ce dossier `backend/`
+# à sa racine (ou avec `rootDir: backend` si le dépôt est le monorepo).
+services:
+  - type: web
+    name: leadflow-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: false          # aucun déploiement implicite : déclenchement manuel
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # --- à renseigner dans le Dashboard Render (sync: false => jamais écrit dans Git) ---
+      - key: DATABASE_URL          # Neon, URL "pooled" + ?sslmode=require
+        sync: false
+      - key: DATABASE_URL_DIRECT   # Neon, URL directe (migrations Alembic)
+        sync: false
+      - key: FRONTEND_URL          # https://<projet>.vercel.app
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: DEMO_ADMIN_PASSWORD
+        sync: false
+      - key: DEMO_SALES_PASSWORD
+        sync: false
+      - key: OPENAI_API_KEY        # laisser vide tant que LLM_PROVIDER=mock
+        sync: false
+      # --- secrets générés par Render (à recopier dans les credentials n8n pour API_SERVICE_TOKEN) ---
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: API_SERVICE_TOKEN
+        generateValue: true
+      # --- configuration ---
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      - key: SESSION_COOKIE_SAMESITE
+        value: lax                 # proxy Vercel /api -> Render : même origine pour le navigateur
+      - key: LLM_PROVIDER
+        value: mock
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: CRM_PROVIDER
+        value: mock
+      - key: ENABLE_REAL_EMAIL_SEND
+        value: "false"
+      - key: PUBLIC_RATE_LIMIT_PER_HOUR
+        value: "25"
+      - key: LLM_DAILY_CALL_LIMIT
+        value: "200"

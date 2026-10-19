@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { login } from './helpers'
 
 // Captures de documentation (données de DÉMONSTRATION synthétiques). Exécution : E2E_SCREENSHOTS=1 npx playwright test screenshots
@@ -8,9 +8,9 @@ const OUT = resolve(import.meta.dirname, '../../../docs/screenshots')
 test.skip(!process.env.E2E_SCREENSHOTS, 'captures désactivées par défaut (E2E_SCREENSHOTS=1)')
 test.use({ viewport: { width: 1360, height: 860 } })
 
-async function shot(page: import('@playwright/test').Page, name: string) {
+async function shot(page: Page, name: string) {
   mkdirSync(OUT, { recursive: true })
-  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(600)
   await page.screenshot({ path: resolve(OUT, `${name}.png`), fullPage: false })
 }
 

@@ -1,0 +1,66 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Aucune clé OpenAI/HubSpot requise : LLM_PROVIDER=mock, CRM_PROVIDER=mock, tests réels exclus.
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: leadflow, POSTGRES_PASSWORD: leadflow_ci, POSTGRES_DB: leadflow_test }
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U leadflow" --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults: { run: { working-directory: backend } }
+    env:
+      DATABASE_URL: postgresql+psycopg://leadflow:leadflow_ci@localhost:5433/leadflow_test
+      API_SERVICE_TOKEN: ci-only-token-ci-only-token-ci-only-token-0000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements-dev.txt }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - name: Migrations sur base vierge + dérive modèles/migrations
+        run: |
+          alembic upgrade head
+          alembic check
+          python -m scripts.verify_schema
+      - run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  n8n-and-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Workflows n8n valides, désactivés, sans secret, sans envoi d'e-mail
+        run: python automation/n8n/tools/validate_workflows.py
+      - name: Les JSON sont à jour par rapport au générateur
+        run: |
+          python automation/n8n/tools/build_workflows.py
+          git diff --exit-code -- automation/n8n/*.json
+      - name: Recherche élémentaire de secrets
+        run: |
+          if git grep -nE "sk-[A-Za-z0-9_-]{20,}|pat-(na|eu)[0-9]-[0-9a-f-]{20,}|-----BEGIN (RSA |EC )?PRIVATE KEY" -- . ':!docs/blueprint'; then
+            echo "Secret potentiel détecté"; exit 1; fi

@@ -268,6 +268,15 @@ def overview(db: Session, org_id: uuid.UUID, days: int = 14) -> dict[str, Any]:
               FROM qualifications q JOIN leads l ON l.id = q.lead_id
               WHERE l.organization_id = :org AND q.version = 1 AND NOT l.is_demo) t"""), {"org": org_id}).one()
 
+    perf = db.execute(
+        select(func.count(), func.avg(AutomationRun.duration_ms),
+               func.percentile_cont(0.95).within_group(AutomationRun.duration_ms))
+        .where(AutomationRun.status == "SUCCEEDED", AutomationRun.duration_ms.is_not(None),
+               AutomationRun.started_at >= datetime.now(UTC) - timedelta(days=7))).one()
+    retries = db.scalar(
+        select(func.coalesce(func.sum(OutboxEvent.attempt_count - 1), 0))
+        .where(OutboxEvent.organization_id == org_id, OutboxEvent.attempt_count > 1)) or 0
+
     llm = db.execute(
         select(func.count(), func.coalesce(func.sum(LlmUsage.input_tokens), 0),
                func.coalesce(func.sum(LlmUsage.output_tokens), 0), func.sum(LlmUsage.estimated_cost_usd))
@@ -299,6 +308,11 @@ def overview(db: Session, org_id: uuid.UUID, days: int = 14) -> dict[str, Any]:
         "qualification_latency_seconds": {
             "samples": lat.n, "p50": float(lat.p50) if lat.p50 is not None else None,
             "p95": float(lat.p95) if lat.p95 is not None else None, "scope": "leads non démo, première qualification",
+        },
+        "automation_performance": {
+            "successful_runs_7d": perf[0], "avg_duration_ms": float(perf[1]) if perf[1] is not None else None,
+            "p95_duration_ms": float(perf[2]) if perf[2] is not None else None, "retries_total": int(retries),
+            "dead_letter": outbox_counts.get("DEAD_LETTER", 0),
         },
         "llm_usage": {"calls": llm[0], "input_tokens": int(llm[1]), "output_tokens": int(llm[2]),
                       "estimated_cost_usd": float(llm[3]) if llm[3] is not None else None, "scope": "appels non mock"},

@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://YOUR-RENDER-SERVICE.onrender.com/api/:path*"
+      "destination": "__RENDER_API_ORIGIN__/api/:path*"
     },
     {
       "source": "/((?!api/|assets/|favicon.svg).*)",

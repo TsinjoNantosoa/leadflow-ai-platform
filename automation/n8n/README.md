@@ -11,7 +11,7 @@ Quatre exports **importables**, livrés **désactivés** (`"active": false`), sa
 
 ## Principes
 
-- **Pull, pas push** : Render Free peut dormir. WF-04 interroge l'API toutes les minutes ; l'état vit dans PostgreSQL.
+- **Pull, pas push** : Render Free peut dormir. WF-04 est **réveillé par le backend** (webhook `lf-wf-04-wake`, best-effort) après chaque soumission et sonde l'API par **filet de récupération toutes les 20 min** (réglable : `python tools/build_workflows.py --poll-minutes 30`, ou éditer le nœud *Schedule Trigger*). L'état vit dans PostgreSQL ; perdre un réveil ne perd aucun événement.
 - **Le backend est l'unique autorité des retries.** Aucun nœud n'a de « Retry on fail » : chaque échec est rapporté (`/outbox/{id}/fail`) et l'API décide (backoff exponentiel + jitter, `max_attempts`, dead-letter). Un 200 du webhook enfant (`202`) n'est **qu'un accusé** ; le succès métier est `complete`.
 - **Aucune clé OpenAI dans n8n.** n8n appelle `…/extract` et `…/draft/generate` ; FastAPI parle à OpenAI.
 - **Aucun nœud d'envoi d'e-mail** dans aucun workflow (`grep -i "send\|email\|smtp\|gmail"` ne retourne que des commentaires).

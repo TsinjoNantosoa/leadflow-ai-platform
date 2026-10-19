@@ -8,6 +8,7 @@ const emptyOverview = {
   generated_at: '2026-10-19T10:00:00Z', data_origin: { total_leads: 0, demo_leads: 0, real_leads: 0 },
   leads: { received: 0, qualified: 0, manual_review: 0, failed: 0, in_progress: 0, by_status: {} },
   segments: { HOT: 0, WARM: 0, COLD: 0 }, series: [], runs_last_7_days: {}, outbox: {}, drafts: {}, crm: {},
+  automation_performance: { successful_runs_7d: 0, avg_duration_ms: null, p95_duration_ms: null, retries_total: 0, dead_letter: 0 },
   qualification_latency_seconds: { samples: 0, p50: null, p95: null, scope: '' },
   llm_usage: { calls: 0, input_tokens: 0, output_tokens: 0, estimated_cost_usd: null, scope: '' }, recent_activity: [],
 }
@@ -44,7 +45,8 @@ describe('Navigation et accès', () => {
     await user.type(screen.getByLabelText(/e-mail/i), 'sales@novadigital.example')
     await user.type(screen.getByLabelText(/mot de passe/i), 'secret-pass')
     await user.click(screen.getByRole('button', { name: /se connecter/i }))
-    expect(await screen.findByRole('heading', { name: /vue d’ensemble/i })).toBeInTheDocument()
+    // 1re importation du chunk Vue d’ensemble (recharts) : lente sous charge parallèle, d’où le délai élargi
+    expect(await screen.findByRole('heading', { name: /vue d’ensemble/i }, { timeout: 15000 })).toBeInTheDocument()
     expect(api.calls.find((c) => c.url.pathname === '/api/v1/auth/login')?.json).toEqual({ email: 'sales@novadigital.example', password: 'secret-pass' })
     expect(localStorage.getItem('lf-token')).toBeNull()
     expect(JSON.stringify({ ...localStorage })).not.toContain('csrf-test-token')

@@ -64,6 +64,7 @@ function Content({ data }: { data: Overview }) {
   const workflows = Object.entries(data.runs_last_7_days)
   const incidents = (data.outbox.DEAD_LETTER ?? 0) + (data.outbox.RETRYING ?? 0)
   const lat = data.qualification_latency_seconds
+  const perf = data.automation_performance
 
   return (
     <div className="space-y-6">
@@ -232,6 +233,12 @@ function Content({ data }: { data: Overview }) {
               {lat.samples > 0 && lat.p50 !== null
                 ? `Délai réception → qualification (non démo, ${lat.samples} mesure${lat.samples > 1 ? 's' : ''}) : médiane ${formatDuration(lat.p50 * 1000)}${lat.p95 !== null ? `, p95 ${formatDuration(lat.p95 * 1000)}` : ''}.`
                 : 'Aucune mesure de délai de qualification disponible (les leads de démonstration sont exclus).'}
+            </p>
+            <p className="text-xs text-muted-foreground" data-testid="automation-performance">
+              {perf.successful_runs_7d > 0 && perf.avg_duration_ms !== null
+                ? `Traitements réussis (7 j) : ${perf.successful_runs_7d}, durée moyenne ${formatDuration(perf.avg_duration_ms)}${perf.p95_duration_ms !== null ? `, p95 ${formatDuration(perf.p95_duration_ms)}` : ''}. `
+                : 'Aucun traitement réussi sur 7 jours. '}
+              Reprises cumulées : {perf.retries_total} · dead-letters : {perf.dead_letter}.
             </p>
           </CardContent>
         </Card>

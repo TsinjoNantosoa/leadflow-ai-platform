@@ -10,7 +10,7 @@ La procédure détaillée, pas à pas, est dans [`automation/n8n/IMPORT_GUIDE.md
 - Les 3 credentials sont nouveaux et préfixés `LF - ` ; n'en réutilisez aucun existant.
 - Aucune variable d'environnement n8n à ajouter ni à modifier (la configuration passe par le nœud `LF Config` et les credentials) : **aucun redémarrage de n8n n'est requis**.
 - Les webhooks ajoutés : `/webhook/lf-wf-01-lead-qualification`, `/lf-wf-02-crm-sync`, `/lf-wf-03-followup-draft` (authentifiés par en-tête). Aucun chemin existant n'est écrasé ; vérifiez qu'aucun de vos workflows n'utilise ces chemins.
-- Charge ajoutée : 1 exécution/minute de WF-04 (+ exécutions des enfants uniquement quand un événement existe). Si vous préférez, passez la planification à 2–5 min (nœud *Schedule Trigger*).
+- Charge ajoutée : ≈ 72 exécutions/jour de WF-04 (poll de récupération à 20 min, ~2 200/mois) + 1 réveil par soumission + exécutions des enfants uniquement quand un événement existe. Intervalle réglable (`build_workflows.py --poll-minutes N` ou nœud *Schedule Trigger*). Ne descendez pas à ~5 min : cela maintiendrait Render Free éveillé en permanence.
 
 ## Tableau des paramètres
 

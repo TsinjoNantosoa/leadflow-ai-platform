@@ -264,6 +264,9 @@ def test_metrics_are_computed_from_database(client, worker, db):
     assert m["data_origin"] == {"total_leads": 4, "demo_leads": 0, "real_leads": 4}
     assert m["qualification_latency_seconds"]["samples"] == 2
     assert m["runs_last_7_days"]["LF-WF-01-Lead-Qualification"]["SUCCEEDED"] == 2
+    perf = m["automation_performance"]
+    assert perf["successful_runs_7d"] >= 2 and perf["avg_duration_ms"] is not None
+    assert perf["retries_total"] == 0 and perf["dead_letter"] == 0
     assert m["llm_usage"]["calls"] == 0  # les appels mock ne sont jamais comptés comme consommation réelle
 
 
@@ -272,6 +275,7 @@ def test_metrics_on_empty_database_do_not_invent_values(client):
     m = client.get("/api/v1/metrics/overview").json()
     assert m["leads"]["received"] == 0 and m["qualification_latency_seconds"]["p50"] is None
     assert m["llm_usage"]["estimated_cost_usd"] is None and m["recent_activity"] == []
+    assert m["automation_performance"]["avg_duration_ms"] is None and m["automation_performance"]["retries_total"] == 0
 
 
 def test_automation_runs_list_filters(client, worker):

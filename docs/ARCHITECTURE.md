@@ -38,7 +38,7 @@ flowchart LR
 ## Flux nominal
 
 1. `POST /api/v1/public/leads` : une transaction écrit contact (upsert), lead, événement d'intake, événement **outbox** `LEAD_SUBMITTED` et deux entrées d'audit. La réponse `201` ne dépend ni de l'IA ni du CRM.
-2. **LF-WF-04** (planifié toutes les minutes sur OVH) appelle `POST /internal/outbox/claim` : réservation atomique (`FOR UPDATE SKIP LOCKED`) avec *lease* ; le backend crée le *run* correspondant.
+2. **LF-WF-04** (réveillé par le backend après chaque soumission — best-effort — et planifié toutes les 20 min en filet de récupération, sur OVH) appelle `POST /internal/outbox/claim` : réservation atomique (`FOR UPDATE SKIP LOCKED`) avec *lease* ; le backend crée le *run* correspondant.
 3. WF-04 route chaque événement vers le webhook du workflow enfant (accusé `202` immédiat).
 4. **LF-WF-01** : lit le lead → idempotence → `extract` (FastAPI appelle OpenAI) → validation → `qualification` (le **serveur** calcule score, segment, facteurs) → `complete`. Le backend émet alors `CRM_SYNC_REQUESTED` et `DRAFT_REQUESTED`.
 5. **LF-WF-02** : contexte + `CRM_PROVIDER` (autorité : le backend) → mock *ou* HubSpot (recherche par e-mail → mise à jour/création → réconciliation du 409) → `crm-sync` → `complete`.

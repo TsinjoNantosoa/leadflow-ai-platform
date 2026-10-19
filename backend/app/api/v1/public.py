@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -12,16 +12,19 @@ from app.core.errors import ApiError
 from app.database.session import get_db
 from app.schemas.public import LeadCreate, LeadReceipt
 from app.services.intake import get_default_org, hash_ip, submit_lead
+from app.services.wake import notify_n8n_wake
 
 router = APIRouter(prefix="/public", tags=["public"])
 log = logging.getLogger("leadflow.public")
 
 
 def client_ip(request: Request) -> str | None:
-    if get_settings().trust_proxy_headers:
-        fwd = request.headers.get("x-forwarded-for")
-        if fwd:
-            return fwd.split(",")[0].strip()
+    settings = get_settings()
+    if settings.trust_proxy_headers:
+        # Seules les entrées ajoutées par NOS proxys sont fiables : on compte depuis la droite.
+        hops = [h.strip() for h in request.headers.get("x-forwarded-for", "").split(",") if h.strip()]
+        if len(hops) >= settings.trusted_proxy_hops:
+            return hops[-settings.trusted_proxy_hops]
     return request.client.host if request.client else None
 
 
@@ -42,6 +45,7 @@ def create_lead(
     payload: LeadCreate,
     request: Request,
     response: Response,
+    background: BackgroundTasks,
     db: Annotated[Session, Depends(get_db)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ):
@@ -62,4 +66,6 @@ def create_lead(
     if replayed:
         response.status_code = 200
         response.headers["Idempotent-Replayed"] = "true"
+    else:
+        background.add_task(notify_n8n_wake)  # après la réponse ; échec sans conséquence
     return receipt

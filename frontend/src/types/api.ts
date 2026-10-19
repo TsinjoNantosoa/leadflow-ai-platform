@@ -205,6 +205,13 @@ export interface Overview {
   outbox: Partial<Record<OutboxStatus, number>>
   drafts: Partial<Record<FollowupStatus, number>>
   crm: Partial<Record<CrmSyncStatus, number>>
+  automation_performance: {
+    successful_runs_7d: number
+    avg_duration_ms: number | null
+    p95_duration_ms: number | null
+    retries_total: number
+    dead_letter: number
+  }
   qualification_latency_seconds: { samples: number; p50: number | null; p95: number | null; scope: string }
   llm_usage: { calls: number; input_tokens: number; output_tokens: number; estimated_cost_usd: number | null; scope: string }
   recent_activity: {

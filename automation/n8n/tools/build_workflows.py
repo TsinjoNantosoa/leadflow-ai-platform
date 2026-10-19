@@ -25,6 +25,7 @@ from n8n_builder import (  # noqa: E402
 )
 
 OUT = Path(__file__).resolve().parents[1]
+POLL_MINUTES = 20  # filet de récupération ; surchargeable : python build_workflows.py --poll-minutes 30
 EV = CFG  # alias lisible : $('LF Config').first().json
 
 
@@ -439,10 +440,17 @@ def wf03() -> Workflow:
 def wf04() -> Workflow:
     wf = Workflow("LF-WF-04 Operations Recovery",
                   "Planification : réserve les événements outbox prêts (lease) et les route vers WF-01/02/03. Reprise après crash.")
-    wf.node("Schedule Trigger", "n8n-nodes-base.scheduleTrigger", 1.2,
-            {"rule": {"interval": [{"field": "minutes", "minutesInterval": 1}]}}, (0, 300),
-            notes="Toutes les minutes. Le backend Render peut dormir : le premier appel réveille le service (timeout 90 s).")
-    wf.node("Manual Trigger", "n8n-nodes-base.manualTrigger", 1, {}, (0, 480), notes="Lancement manuel pour tester / reprendre immédiatement.")
+    wf.node("Schedule Trigger (recovery poll)", "n8n-nodes-base.scheduleTrigger", 1.2,
+            {"rule": {"interval": [{"field": "minutes", "minutesInterval": POLL_MINUTES}]}}, (0, 220),
+            notes=f"Filet de récupération toutes les {POLL_MINUTES} min (réglable : voir README, `--poll-minutes`, ou éditer ce nœud). "
+                  "Le déclenchement normal est le webhook « Wake » appelé par le backend après chaque soumission. "
+                  "Le backend Render peut dormir : le premier appel le réveille (timeout 90 s).")
+    wf.node("Wake Webhook (best-effort, from backend)", "n8n-nodes-base.webhook", 2,
+            {"httpMethod": "POST", "path": "lf-wf-04-wake", "authentication": "headerAuth", "responseMode": "onReceived",
+             "options": {}}, (0, 380), credentials=CRED_WEBHOOK_HEADER, webhook=True,
+            notes="Appelé par FastAPI après l'enregistrement d'une demande (au mieux). Ne transporte aucune donnée métier : "
+                  "il déclenche seulement une réservation d'événements. Sa perte est sans conséquence (le poll de récupération reprend).")
+    wf.node("Manual Trigger", "n8n-nodes-base.manualTrigger", 1, {}, (0, 540), notes="Lancement manuel pour tester / reprendre immédiatement.")
     wf.set_node("LF Config", {
         "api_base_url": API_PLACEHOLDER,
         "n8n_base_url": N8N_PLACEHOLDER,
@@ -500,7 +508,8 @@ def wf04() -> Workflow:
     wf.node("Alert Placeholder (connect Slack / e-mail interne)", "n8n-nodes-base.noOp", 1, {}, (480, 800),
             notes="Brancher ici une notification INTERNE (jamais un e-mail commercial). Le backend reste la source de vérité des états.")
 
-    wf.connect("Schedule Trigger", "LF Config")
+    wf.connect("Schedule Trigger (recovery poll)", "LF Config")
+    wf.connect("Wake Webhook (best-effort, from backend)", "LF Config")
     wf.connect("Manual Trigger", "LF Config")
     wf.chain("LF Config", "Claim Events", "Claim OK?")
     wf.connect("Claim OK?", "Split Events", 0)
@@ -522,6 +531,11 @@ def wf04() -> Workflow:
 
 
 def main() -> None:
+    global POLL_MINUTES
+    if "--poll-minutes" in sys.argv:
+        POLL_MINUTES = int(sys.argv[sys.argv.index("--poll-minutes") + 1])
+        if not 1 <= POLL_MINUTES <= 720:
+            raise SystemExit("--poll-minutes doit être compris entre 1 et 720")
     for fn, filename in ((wf01, "WF-01-Lead-Qualification.json"), (wf02, "WF-02-HubSpot-CRM-Sync.json"),
                          (wf03, "WF-03-Followup-Draft.json"), (wf04, "WF-04-Operations-Recovery.json")):
         path = fn().write(OUT, filename)

@@ -44,7 +44,7 @@ Pré-test API : `curl https://<service>.onrender.com/api/v1/health` (réveille R
 ## 5. Ordre d'activation
 
 1. `LF-WF-01`, `LF-WF-02`, `LF-WF-03` (les trois webhooks) — dans cet ordre ou non, mais **avant** WF-04.
-2. `LF-WF-04` en dernier : il déclenche réellement les traitements toutes les minutes.
+2. `LF-WF-04` en dernier : il déclenche réellement les traitements : au réveil envoyé par le backend (webhook `lf-wf-04-wake`, header `X-LeadFlow-Webhook-Secret`) et toutes les 20 min en filet de récupération. Pour activer le réveil : renseignez sur Render `N8N_WAKE_WEBHOOK_URL=https://<votre-n8n>/webhook/lf-wf-04-wake` et `N8N_WEBHOOK_SECRET` (même valeur que le credential `LF - n8n Webhook Secret`). Sans cela, seul le poll agit (latence ≤ 20 min).
 
 ## 6. Vérifier après import
 
@@ -53,7 +53,7 @@ Pré-test API : `curl https://<service>.onrender.com/api/v1/health` (réveille R
 | Dashboard → Automatisations | 3 runs `Réussi` par lead (qualification, CRM, brouillon) |
 | Dashboard → Revue humaine | Un brouillon `Brouillon` à examiner |
 | Lead → Parcours | 6 étapes terminées, « Revue humaine » en attente |
-| n8n → Executions | Aucune exécution en erreur ; WF-04 chaque minute |
+| n8n → Executions | Aucune exécution en erreur ; WF-04 toutes les 20 min (+ à chaque soumission si le réveil est configuré) |
 | Aucun e-mail reçu | Normal : il n'existe aucun envoi |
 
 ## 7. Passer en HubSpot réel (plus tard, après le test réel)

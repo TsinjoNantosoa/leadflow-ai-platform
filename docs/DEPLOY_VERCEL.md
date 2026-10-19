@@ -19,14 +19,16 @@ Frontend (Vercel) et API (Render) sont sur des **domaines différents**. Un cook
 
 Déjà définis dans `frontend/vercel.json`.
 
-## 2. Éditer **une** valeur avant le déploiement
+## 2. Renseigner l'origine de l'API (une commande, une seule fois)
 
-Dans `frontend/vercel.json`, remplacez le placeholder :
+Les destinations de `rewrites` ne supportent pas les variables d'environnement. `frontend/vercel.json` contient donc le jeton `__RENDER_API_ORIGIN__`, remplacé par **votre** URL Render (publique, pas un secret) :
 
-```json
-{ "source": "/api/:path*", "destination": "https://YOUR-RENDER-SERVICE.onrender.com/api/:path*" }
+```bash
+cd frontend
+npm run configure:vercel -- https://<votre-service>.onrender.com    # valide : https, sans chemin, pas d'URL factice/locale
+git diff vercel.json                                                 # vérifiez, puis committez
 ```
-par l'URL de votre service Render (HTTPS). Les destinations de `rewrites` ne supportent pas les variables d'environnement.
+Garde-fou : `npm run build` exécute d'abord `vercel-config.mjs --check`, qui **fait échouer le build sur Vercel** (`VERCEL=1`) si le jeton est encore présent — aucun déploiement ne peut partir avec une URL inventée. En local, le build n'est pas bloqué.
 
 Le second `rewrite` (`/((?!api/|assets/|favicon.svg).*) → /index.html`) fournit le **fallback SPA** : `/app/leads/123` et `/login` fonctionnent en accès direct et au rechargement.
 
@@ -55,6 +57,10 @@ Le premier appel après inactivité peut prendre ~1 min. Le frontend : (1) réve
 3. Connexion → cookie `lf_session` `HttpOnly; Secure; SameSite=Lax` (DevTools › Application).
 4. `/demo` → soumission → identifiant de demande.
 
-## 7. Indépendance
+## 7. Ce qui n'est **pas** vérifié
+
+Le rewrite Vercel → Render n'a pas pu être exécuté localement (nécessite un projet Vercel). Le comportement « même origine + cookie first-party » est validé par le proxy Vite de développement et Playwright, pas par Vercel. À contrôler à la première mise en ligne (section 6). **Retour arrière** : *Deployments → Promote* du déploiement précédent.
+
+## 8. Indépendance
 
 `frontend/` n'importe aucun code Python ni fichier du backend ; il peut être extrait dans son propre dépôt tel quel (`package.json`, `package-lock.json`, `vercel.json`, `.env.example`).

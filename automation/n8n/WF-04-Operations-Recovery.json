@@ -7,20 +7,46 @@
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 1
+              "minutesInterval": 20
             }
           ]
         }
       },
-      "id": "d07cb91f-7fe1-575a-8fee-403fe552cf08",
-      "name": "Schedule Trigger",
+      "id": "abdc0c06-67a9-50b4-8f28-7695015a2ae4",
+      "name": "Schedule Trigger (recovery poll)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
         0,
-        300
+        220
       ],
-      "notes": "Toutes les minutes. Le backend Render peut dormir : le premier appel réveille le service (timeout 90 s).",
+      "notes": "Filet de récupération toutes les 20 min (réglable : voir README, `--poll-minutes`, ou éditer ce nœud). Le déclenchement normal est le webhook « Wake » appelé par le backend après chaque soumission. Le backend Render peut dormir : le premier appel le réveille (timeout 90 s).",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lf-wf-04-wake",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "4f4e2236-b4c3-50fe-968b-2f932fc3956d",
+      "name": "Wake Webhook (best-effort, from backend)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        380
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LF_CRED_N8N_WEBHOOK_SECRET",
+          "name": "LF - n8n Webhook Secret"
+        }
+      },
+      "webhookId": "d88abb73-e01a-5f92-8fa1-aca519a6f009",
+      "notes": "Appelé par FastAPI après l'enregistrement d'une demande (au mieux). Ne transporte aucune donnée métier : il déclenche seulement une réservation d'événements. Sa perte est sans conséquence (le poll de récupération reprend).",
       "notesInFlow": false
     },
     {
@@ -31,7 +57,7 @@
       "typeVersion": 1,
       "position": [
         0,
-        480
+        540
       ],
       "notes": "Lancement manuel pour tester / reprendre immédiatement.",
       "notesInFlow": false
@@ -85,8 +111,8 @@
         "width": 400,
         "color": 3
       },
-      "id": "1ce79da4-ad97-504b-97fb-731ade13d671",
-      "name": "Note 4",
+      "id": "5bb326f2-61ed-5f85-99ca-f20ef31eed7c",
+      "name": "Note 5",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -635,8 +661,8 @@
         "width": 520,
         "color": 7
       },
-      "id": "20c7aad6-ce4a-580d-b40e-59e465d4b643",
-      "name": "Note 20",
+      "id": "ceef2008-d4c8-56d2-8389-7db5a3b3f2e6",
+      "name": "Note 21",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -646,7 +672,18 @@
     }
   ],
   "connections": {
-    "Schedule Trigger": {
+    "Schedule Trigger (recovery poll)": {
+      "main": [
+        [
+          {
+            "node": "LF Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wake Webhook (best-effort, from backend)": {
       "main": [
         [
           {

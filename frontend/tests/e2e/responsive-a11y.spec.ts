@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { login } from './helpers'
 
-const hasHorizontalScroll = (page: import('@playwright/test').Page) =>
+const hasHorizontalScroll = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
 
 test.describe('mobile (375 px) — T18', () => {

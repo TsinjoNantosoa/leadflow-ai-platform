@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     login_max_failures: int = Field(5, ge=1)
     login_lock_minutes: int = Field(15, ge=1)
     trust_proxy_headers: bool = False
+    # Nombre de proxys de confiance DEVANT l'application (ex. Render seul = 1). L'IP cliente est lue en comptant
+    # depuis la DROITE de X-Forwarded-For : les entrées de gauche sont fournies par le client et falsifiables.
+    trusted_proxy_hops: int = Field(1, ge=1, le=5)
 
     # --- Public API --------------------------------------------------------------------------
     public_rate_limit_per_hour: int = Field(25, ge=1)
@@ -70,6 +73,11 @@ class Settings(BaseSettings):
     # Les credentials HubSpot vivent uniquement dans n8n ; le backend ne connaît que le mode.
     crm_provider: Literal["mock", "hubspot"] = "mock"
     enable_real_email_send: bool = False
+
+    # --- Réveil best-effort de n8n (jamais bloquant ; l'outbox + le poll WF-04 restent la garantie) ---------
+    n8n_wake_webhook_url: str = ""  # ex. https://n8n.example.com/webhook/lf-wf-04-wake ; vide = désactivé
+    n8n_webhook_secret: SecretStr = SecretStr("")  # même valeur que le credential n8n « LF - n8n Webhook Secret »
+    n8n_wake_timeout_seconds: float = Field(3.0, gt=0, le=10)
 
     # --- Outbox ------------------------------------------------------------------------------
     outbox_lease_seconds: int = Field(300, ge=30)
